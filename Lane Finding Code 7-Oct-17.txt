@@ -1,0 +1,286 @@
+# TODO: Build your pipeline that will draw lane lines on the test_images
+# then save them to the test_images directory.
+# plt.imshow(image)
+
+import math
+
+#reading in an image
+#image = mpimg.imread('test_images/solidWhiteRight.jpg')
+#image = mpimg.imread('test_images/solidWhiteCurve.jpg')
+#image = mpimg.imread('test_images/solidYellowLeft.jpg')
+image = mpimg.imread('test_images/solidYellowCurve.jpg')
+#image = mpimg.imread('test_images/solidYellowCurve2.jpg')
+
+
+def grayscale(img):
+    """Applies the Grayscale transform
+    This will return an image with only one color channel
+    but NOTE: to see the returned image as grayscale
+    (assuming your grayscaled image is called 'gray')
+    you should call plt.imshow(gray, cmap='gray')"""
+    return cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    # Or use BGR2GRAY if you read an image with cv2.imread()
+    # return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    
+gray_image = grayscale(image)
+
+plt.imshow(gray_image, cmap='gray')
+
+
+kernel_size = 5
+
+def gaussian_blur(img, kernel_size):
+    """Applies a Gaussian Noise kernel"""
+    return cv2.GaussianBlur(img, (kernel_size, kernel_size), 0)
+
+gaus_image = gaussian_blur(gray_image, kernel_size)
+
+#plt.imshow(gaus_image)
+
+
+low_threshold = 50
+high_threshold = 150
+
+def canny(img, low_threshold, high_threshold):
+    """Applies the Canny transform"""
+    return cv2.Canny(img, low_threshold, high_threshold)
+
+canny_image = canny(gaus_image, low_threshold, high_threshold) 
+
+plt.imshow(canny_image, cmap='Greys_r')
+
+# Next we'll create a masked edges image using cv2.fillPoly()
+mask = np.zeros_like(canny_image)   
+ignore_mask_color = 255   
+
+# This time we are defining a four sided polygon to mask
+imshape = image.shape
+vertices = np.array([[(40,imshape[0]),(410, 330), (550, 330), (imshape[1],imshape[0])]], dtype=np.int32)
+mask_image = cv2.fillPoly(mask, vertices, ignore_mask_color)
+#mask_real_image = cv2.fillPoly(image, vertices, ignore_mask_color)
+masked_edges = cv2.bitwise_and(canny_image, mask)
+
+#plt.imshow(mask_real_image)
+
+
+def draw_lines(img, lines, color=[255, 0, 0], thickness=2):
+    """
+    NOTE: this is the function you might want to use as a starting point once you want to 
+    average/extrapolate the line segments you detect to map out the full
+    extent of the lane (going from the result shown in raw-lines-example.mp4
+    to that shown in P1_example.mp4).  
+    
+    Think about things like separating line segments by their 
+    slope ((y2-y1)/(x2-x1)) to decide which segments are part of the left
+    line vs. the right line.  Then, you can average the position of each of 
+    the lines and extrapolate to the top and bottom of the lane.
+    
+    This function draws `lines` with `color` and `thickness`.    
+    Lines are drawn on the image inplace (mutates the image).
+    If you want to make the lines semi-transparent, think about combining
+    this function with the weighted_img() function below
+    """
+    for line in lines:
+        for x1,y1,x2,y2 in line:
+            cv2.line(img, (x1, y1), (x2, y2), color, thickness)
+
+# Define the Hough transform parameters
+# Make a blank the same size as our image to draw on
+rho = 3 # distance resolution in pixels of the Hough grid
+theta = 5*np.pi/180 # angular resolution in radians of the Hough grid
+threshold = 15   # minimum number of votes (intersections in Hough grid cell)
+min_line_length = 40 #minimum number of pixels making up a line
+max_line_gap = 20    # maximum gap in pixels between connectable line segments
+line_image = np.copy(image)*0 # creating a blank to draw lines on
+
+# Run Hough on edge detected image
+# Output "lines" is an array containing endpoints of detected line segments
+#lines = cv2.HoughLinesP(masked_edges, rho, theta, threshold, np.array([])
+
+def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap):
+    """
+    `img` should be the output of a Canny transform.
+        
+    Returns an image with hough lines drawn.
+    """
+    lines = cv2.HoughLinesP(img, rho, theta, threshold, np.array([]), minLineLength=min_line_len, maxLineGap=max_line_gap)
+    line_img = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
+    draw_lines(line_img, lines)
+    return line_img, lines
+
+line_img, lines = hough_lines(masked_edges, rho, theta, threshold, min_line_length, max_line_gap)
+plt.imshow(line_img)
+print(lines)
+
+cv2.imwrite("test_images_output/line_image.jpg", line_img) 
+
+def draw_lines(img, lines, color=[255, 0, 0], thickness=2):
+    """
+    NOTE: this is the function you might want to use as a starting point once you want to 
+    average/extrapolate the line segments you detect to map out the full
+    extent of the lane (going from the result shown in raw-lines-example.mp4
+    to that shown in P1_example.mp4).  
+    
+    Think about things like separating line segments by their 
+    slope ((y2-y1)/(x2-x1)) to decide which segments are part of the left
+    line vs. the right line.  Then, you can average the position of each of 
+    the lines and extrapolate to the top and bottom of the lane.
+    
+    This function draws `lines` with `color` and `thickness`.    
+    Lines are drawn on the image inplace (mutates the image).
+    If you want to make the lines semi-transparent, think about combining
+    this function with the weighted_img() function below
+    """
+    for line in lines:
+        for x1,y1,x2,y2 in line:
+            cv2.line(img, (x1, y1), (x2, y2), color, thickness)
+
+           
+
+# Iterate over the output "lines" and draw lines on a blank image
+
+
+# Create a "color" binary image to combine with line image
+#color_edges = np.dstack((canny_image, canny_image, canny_image)) 
+
+# Draw the lines on the edge image
+#lines_edges = cv2.addWeighted(color_edges, 0.8, line_image, 1, 0) 
+#plt.imshow(lines_edges)
+
+x1_left_lane = []
+x2_left_lane = []
+y1_left_lane = []
+y2_left_lane = []
+x1_right_lane = []
+x2_right_lane = []
+y1_right_lane = []
+y2_right_lane = []
+
+for line in lines:
+    for x1,y1,x2,y2 in line:
+            m = (y2 - y1)/(x2 - x1)
+            
+            if abs(m) > 0.4:
+                
+                # Left Lane Marker 
+                if m < 0: 
+                    x1_left_lane.append(x1)
+                    y1_left_lane.append(y1)
+                    x2_left_lane.append(x2)
+                    y2_left_lane.append(y2)
+                
+                # Right Lane Marker 
+                elif m > 0:
+                    x1_right_lane.append(x1)
+                    y1_right_lane.append(y1)
+                    x2_right_lane.append(x2)
+                    y2_right_lane.append(y2)
+                    
+            else: 
+                break 
+                    
+print("Y2 right lane is", y2_right_lane)
+print("Y2 left lane is", y2_left_lane)
+print("X2 right lane is", x2_right_lane)
+print("X2 left lane is", x2_left_lane)
+
+
+#print("x2 right lane is", x2_right_lane)                    
+
+#print("Left lane is", left_lane)
+#print("Right lane is", right_lane)        
+       
+#print("coordinates in left lane", left_lane)
+
+# Find start and end of each line. 
+x1_left_lane = min(x1_left_lane)
+x2_left_lane = max(x2_left_lane)
+y1_left_lane = max(y1_left_lane)
+y2_left_lane = min(y2_left_lane)
+
+print("y_1 left lane is", y1_left_lane)
+
+# Left Lane Slope
+left_lane_m = (y2_left_lane - y1_left_lane)/(x2_left_lane - x1_left_lane)
+# Left Lane Intercept 
+left_lane_b = y2_left_lane - (left_lane_m*x2_left_lane)
+
+image_height, image_width, channels = image.shape
+
+print("image height is", image_height)
+# x coordinate of left lane marker at bottom of image 
+x1_left_lane_start = ((image_height - left_lane_b)/left_lane_m)
+
+x1_left_lane_start = int(round(x1_left_lane_start,0))
+print(x1_left_lane_start)
+
+
+
+#print("x1 left lane is", x1_left_lane)
+#print("y1 left lane is", y1_left_lane)
+#print("x2 left lane is", x2_left_lane)
+
+x1_right_lane = min(x1_right_lane)
+x2_right_lane = max(x2_right_lane)
+y1_right_lane = min(y1_right_lane)
+y2_right_lane = max(y2_right_lane)
+
+print("x1 right lane is", x1_right_lane, "y1 right lane is", y1_right_lane)
+print("x2 right lane is", x2_right_lane, "y2 right lane is", y2_right_lane)
+
+
+
+# Right Lane Slope
+right_lane_m = (y2_right_lane - y1_right_lane)/(x2_right_lane - x1_right_lane)
+# Right Lane Intercept 
+right_lane_b = y2_right_lane - (right_lane_m*x2_right_lane)
+
+# x coordinate of right lane marker at bottom of image 
+x2_right_lane_start = ((image_height - right_lane_b)/right_lane_m)
+print("x2 right lane start is", x2_right_lane_start)
+x2_right_lane_start = int(round(x2_right_lane_start,0))
+print("x2 right lane start is", x2_right_lane_start)
+
+#print("x1 right lane is", x1_right_lane)
+#print("y1 right lane is", y1_right_lane)
+#print("x2 right lane is", x2_right_lane)
+#print("y2 right lane is", y2_right_lane)
+
+#print("Height of image is", image_height)
+
+
+# Draw lines on left lane marker 
+cv2.line(line_image, (x1_left_lane_start, image_height), (x2_left_lane, y2_left_lane), [255, 0, 0], 9)
+        
+# Draw line on right lane marker 
+cv2.line(line_image, (x1_right_lane, y1_right_lane), (x2_right_lane_start, image_height), [255, 0, 0], 9)
+
+def weighted_img(img, initial_img, a=0.8, ß=4., ?=0.):
+    """
+    `img` is the output of the hough_lines(), An image with lines drawn on it.
+    Should be a blank image (all black) with lines drawn on it.
+    
+    `initial_img` should be the image before any processing.
+    
+    The result image is computed as follows:
+    
+    initial_img * a + img * ß + ?
+    NOTE: initial_img and img must be the same shape!
+    """
+    return cv2.addWeighted(initial_img, a, img, ß, ?)
+
+weighted_lines_img = weighted_img(line_image, image)
+
+plt.imshow(weighted_lines_img)
+
+weighted_lines_img_red = cv2.cvtColor(weighted_lines_img, cv2.COLOR_BGR2RGB)
+
+cv2.imwrite("test_images_output/test_output.jpg", weighted_lines_img_red) 
+ 
+
+
+                
+                
+            
+
+
